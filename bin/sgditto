@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="0.1.0"
+PROGNAME="${0##*/}"
+MODE="char"
+
+usage() {
+    cat <<EOF
+Usage: $PROGNAME [-c|-w|-W] [-h] [-V] [FILE...]
+
+Suppress repeated leading content in consecutive lines by replacing
+matching prefixes with spaces, making differences easy to spot.
+
+Options:
+  -c          Character mode (default): compare char-by-char
+  -w          Word mode (small words, like vim 'w')
+  -W          WORD mode (big words, whitespace-delimited, like vim 'W')
+  -h, --help  Show this help message
+  -V, --version  Show version
+
+If no FILE is given, reads from stdin. Use - for explicit stdin.
+
+Examples:
+  ls /usr/local/bin | $PROGNAME
+  $PROGNAME -W logfile.txt
+  diff -u a.txt b.txt | $PROGNAME -w
+EOF
+}
+
+# Parse arguments
+FILES=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -c) MODE="char"; shift ;;
+        -w) MODE="word"; shift ;;
+        -W) MODE="WORD"; shift ;;
+        -h|--help) usage; exit 0 ;;
+        -V|--version) echo "$PROGNAME $VERSION"; exit 0 ;;
+        --) shift; FILES+=("$@"); break ;;
+        -*) echo "$PROGNAME: unknown option: $1" >&2; usage >&2; exit 1 ;;
+        *) FILES+=("$1"); shift ;;
+    esac
+done
+
+# Default to stdin if no files given
+if [[ ${#FILES[@]} -eq 0 ]]; then
+    FILES=("-")
+fi
+
+# Feed all inputs to awk
+feed_input() {
+    for f in "${FILES[@]}"; do
+        if [[ "$f" == "-" ]]; then
+            cat
+        else
+            cat -- "$f"
+        fi
+    done
+}
+
+feed_input | awk -v mode="$MODE" '
+function make_spaces(n,    fmt) {
+    if (n <= 0) return ""
+    fmt = "%" n "s"
+    return sprintf(fmt, "")
+}
+
+function char_ditto(prev, curr,    len_p, len_c, min_len, i) {
+    len_p = length(prev)
+    len_c = length(curr)
+    min_len = (len_p < len_c) ? len_p : len_c
+    for (i = 1; i <= min_len; i++) {
+        if (substr(curr, i, 1) != substr(prev, i, 1))
+            return i - 1
+    }
+    return min_len
+}
+
+function word_ditto(prev, curr,    len_p, len_c, i_p, i_c, start_c, tok_p, tok_c, ch) {
+    len_p = length(prev)
+    len_c = length(curr)
+    i_p = 1; i_c = 1
+    while (1) {
+        # Skip whitespace in both
+        while (i_p <= len_p && substr(prev, i_p, 1) ~ /[ \t]/) i_p++
+        while (i_c <= len_c && substr(curr, i_c, 1) ~ /[ \t]/) i_c++
+        if (i_p > len_p || i_c > len_c) break
+        start_c = i_c
+
+        # Extract token from prev (word chars or single non-word char)
+        ch = substr(prev, i_p, 1)
+        if (ch ~ /[a-zA-Z0-9_]/) {
+            tok_p = ""
+            while (i_p <= len_p && substr(prev, i_p, 1) ~ /[a-zA-Z0-9_]/) {
+                tok_p = tok_p substr(prev, i_p, 1); i_p++
+            }
+        } else {
+            tok_p = ch; i_p++
+        }
+
+        # Extract token from curr
+        ch = substr(curr, i_c, 1)
+        if (ch ~ /[a-zA-Z0-9_]/) {
+            tok_c = ""
+            while (i_c <= len_c && substr(curr, i_c, 1) ~ /[a-zA-Z0-9_]/) {
+                tok_c = tok_c substr(curr, i_c, 1); i_c++
+            }
+        } else {
+            tok_c = ch; i_c++
+        }
+
+        if (tok_p != tok_c) return start_c - 1
+    }
+    # If curr has remaining tokens that prev does not, stop blanking
+    if (i_c <= len_c) {
+        while (i_c <= len_c && substr(curr, i_c, 1) ~ /[ \t]/) i_c++
+        if (i_c <= len_c) return i_c - 1
+    }
+    return length(curr)
+}
+
+function bigword_ditto(prev, curr,    len_p, len_c, i_p, i_c, start_c, tok_p, tok_c) {
+    len_p = length(prev)
+    len_c = length(curr)
+    i_p = 1; i_c = 1
+    while (1) {
+        # Skip whitespace in both
+        while (i_p <= len_p && substr(prev, i_p, 1) ~ /[ \t]/) i_p++
+        while (i_c <= len_c && substr(curr, i_c, 1) ~ /[ \t]/) i_c++
+        if (i_p > len_p || i_c > len_c) break
+        start_c = i_c
+
+        # Extract whitespace-delimited token from prev
+        tok_p = ""
+        while (i_p <= len_p && substr(prev, i_p, 1) !~ /[ \t]/) {
+            tok_p = tok_p substr(prev, i_p, 1); i_p++
+        }
+
+        # Extract whitespace-delimited token from curr
+        tok_c = ""
+        while (i_c <= len_c && substr(curr, i_c, 1) !~ /[ \t]/) {
+            tok_c = tok_c substr(curr, i_c, 1); i_c++
+        }
+
+        if (tok_p != tok_c) return start_c - 1
+    }
+    if (i_c <= len_c) {
+        while (i_c <= len_c && substr(curr, i_c, 1) ~ /[ \t]/) i_c++
+        if (i_c <= len_c) return i_c - 1
+    }
+    return length(curr)
+}
+
+{
+    if (NR == 1) {
+        print
+    } else {
+        if (mode == "char")
+            ditto_len = char_ditto(prev, $0)
+        else if (mode == "word")
+            ditto_len = word_ditto(prev, $0)
+        else
+            ditto_len = bigword_ditto(prev, $0)
+
+        if (ditto_len <= 0)
+            print
+        else if (ditto_len >= length($0))
+            print make_spaces(length($0))
+        else
+            print make_spaces(ditto_len) substr($0, ditto_len + 1)
+    }
+    prev = $0
+}
+'
