@@ -18,7 +18,7 @@ $ ls /usr/local/bin/ba* | sgditto
 
 ```bash
 brew tap soheilghafurian/sgditto https://github.com/soheilghafurian/sgditto
-brew install sgditto
+brew install --HEAD sgditto
 ```
 
 ### From source (any platform)
