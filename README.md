@@ -17,14 +17,14 @@ $ ls /usr/local/bin/ba* | sgditto
 ### Homebrew (macOS / Linux)
 
 ```bash
-brew tap sghaf/sgditto https://github.com/sghaf/sgditto
+brew tap soheilghafurian/sgditto https://github.com/soheilghafurian/sgditto
 brew install sgditto
 ```
 
 ### From source (any platform)
 
 ```bash
-git clone https://github.com/sghaf/sgditto.git
+git clone https://github.com/soheilghafurian/sgditto.git
 cd sgditto
 sudo make install
 ```
@@ -38,7 +38,7 @@ sudo make install PREFIX=/usr
 ### Direct download
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sghaf/sgditto/main/bin/sgditto \
+curl -fsSL https://raw.githubusercontent.com/soheilghafurian/sgditto/main/bin/sgditto \
   -o /usr/local/bin/sgditto && chmod +x /usr/local/bin/sgditto
 ```
 
