@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bats
+        run: sudo apt-get install -y bats
+
+      - name: Run tests
+        run: make test
+
+      - name: Create tarball
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          tar czf "sgditto-${VERSION}.tar.gz" \
+            --transform "s,^,sgditto-${VERSION}/," \
+            bin/sgditto Makefile README.md LICENSE
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: sgditto-*.tar.gz
+          generate_release_notes: true
