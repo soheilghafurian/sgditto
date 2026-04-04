@@ -52,24 +52,23 @@ brew uninstall sgditto       # if installed via Homebrew
 ## Usage
 
 ```
-sgditto [-c|-w|-W] [-h] [-V] [FILE...]
+sgditto [-s SEP] [-k] [-h] [-V] [FILE...]
 ```
 
 | Option | Description |
 |--------|-------------|
-| `-c` | **Character mode** (default) — compare char-by-char |
-| `-w` | **Word mode** — tokenize by word boundaries (like vim `w`) |
-| `-W` | **WORD mode** — tokenize by whitespace (like vim `W`) |
+| `-s SEP` | Split lines by separator characters in SEP. Each character in SEP is an independent separator. Default: `''` (character-by-character comparison). |
+| `-k`, `--keep-sep` | Keep separator characters visible in the blanked prefix. By default, separators are replaced with spaces too. |
 | `-h`, `--help` | Show help |
 | `-V`, `--version` | Show version |
 
 Reads from stdin if no files are given. Use `-` for explicit stdin.
 
-## Modes explained
+## How it works
 
-### Character mode (default, `-c`)
+### Default: character-by-character
 
-Compares each character position with the line above. The longest matching prefix from the start of the line is replaced with spaces.
+With no `-s` option, each character position is compared with the line above. The longest matching prefix is replaced with spaces.
 
 ```
 $ printf "config/settings/production.yml\nconfig/settings/staging.yml\nconfig/defaults.yml\n" | sgditto
@@ -78,31 +77,60 @@ config/settings/production.yml
        defaults.yml
 ```
 
-### Word mode (`-w`)
+### Separator mode (`-s`)
 
-Tokenizes by word boundaries: a "word" is a sequence of `[a-zA-Z0-9_]` characters, and each non-word non-whitespace character is a separate token. Matching leading tokens are replaced with spaces.
+With `-s`, lines are split into tokens by the given separator character(s). Matching leading tokens are replaced with spaces.
 
-```
-$ printf "error_handler_v2\nerror_handler_v3\n" | sgditto -w
-error_handler_v2
-error_handler_v3
-
-$ printf "src/foo.js\nsrc/bar.js\n" | sgditto -w
-src/foo.js
-    bar.js
-```
-
-Word mode preserves whole words — a partial character match within a word does **not** get blanked.
-
-### WORD mode (`-W`)
-
-Tokenizes by whitespace (like vim's `W` motion). Each whitespace-delimited chunk is a token. Matching leading tokens are replaced with spaces.
+#### CSV (comma separator)
 
 ```
-$ printf "ERROR server1 connection timeout\nERROR server1 connection refused\nERROR server2 disk full\n" | sgditto -W
-ERROR server1 connection timeout
-                         refused
-      server2 disk full
+$ printf "John,Smith,42,NY\nJohn,Smith,35,CA\nJohn,Doe,28,TX\n" | sgditto -s ','
+John,Smith,42,NY
+           35,CA
+     Doe,28,TX
+```
+
+#### Paths (slash separator)
+
+```
+$ printf "/usr/local/bin/bash\n/usr/local/bin/dash\n/usr/local/sbin/zsh\n" | sgditto -s '/'
+/usr/local/bin/bash
+               dash
+           sbin/zsh
+```
+
+#### TSV (tab separator)
+
+```bash
+sgditto -s $'\t' data.tsv
+```
+
+#### Multiple separators
+
+Each character in the SEP string is an independent separator:
+
+```
+$ printf "host1:8080|ok\nhost1:8080|err\nhost2:9090|ok\n" | sgditto -s ':|'
+host1:8080|ok
+            err
+host2:9090|ok
+```
+
+### Keep separators visible (`-k`)
+
+By default, separators in the matching prefix are replaced with spaces. Use `-k` to keep them, which helps maintain visual structure:
+
+```
+$ printf "John,Smith,42\nJohn,Smith,35\nJohn,Doe,28\n" | sgditto -s ',' -k
+John,Smith,42
+    ,     ,35
+    ,Doe,28
+```
+
+```
+$ printf "/usr/local/bin/bash\n/usr/local/bin/dash\n" | sgditto -s '/' -k
+/usr/local/bin/bash
+/   /     /   /dash
 ```
 
 ## Examples
@@ -110,20 +138,25 @@ ERROR server1 connection timeout
 ### Spot differences in log output
 
 ```bash
-tail -f app.log | sgditto -W
+tail -f app.log | sgditto -s ' '
 ```
 
-### Compare directory listings
+### Compare sorted environment variables
 
 ```bash
-find . -name "*.go" | sort | sgditto
+env | sort | sgditto -s '='
 ```
 
-### Pipe with other tools
+### Directory listings
 
 ```bash
-env | sort | sgditto
-git log --oneline | sgditto
+find . -name "*.go" | sort | sgditto -s '/'
+```
+
+### CSV diffs with structure
+
+```bash
+sgditto -s ',' -k data.csv
 ```
 
 ## Running tests

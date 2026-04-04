@@ -4,7 +4,7 @@ setup() {
     SGDITTO="$BATS_TEST_DIRNAME/../bin/sgditto"
 }
 
-# ── Character mode (default) ────────────────────────────────────
+# ── Character mode (default, no -s) ─────────────────────────────
 
 @test "char: single line is unchanged" {
     run bash -c 'echo "hello" | "$1"' -- "$SGDITTO"
@@ -68,100 +68,132 @@ setup() {
     [ "$result" = "$expected" ]
 }
 
-@test "char: explicit -c flag works" {
-    run bash -c 'printf "abc\nabd" | "$1" -c' -- "$SGDITTO"
+# ── Separator mode: comma ───────────────────────────────────────
+
+@test "sep comma: matching prefix tokens" {
+    run bash -c 'printf "John,Smith,42,NY\nJohn,Smith,35,CA" | "$1" -s ","' -- "$SGDITTO"
     [ "$status" -eq 0 ]
-    [ "${lines[1]}" = "  d" ]
+    [ "${lines[0]}" = "John,Smith,42,NY" ]
+    [ "${lines[1]}" = "           35,CA" ]
 }
 
-# ── Small word mode (-w) ────────────────────────────────────────
-
-@test "word: matching word prefix" {
-    run bash -c 'printf "the quick brown fox\nthe quick red fox" | "$1" -w' -- "$SGDITTO"
+@test "sep comma: no matching tokens" {
+    run bash -c 'printf "a,b,c\nx,y,z" | "$1" -s ","' -- "$SGDITTO"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "the quick brown fox" ]
-    [ "${lines[1]}" = "          red fox" ]
+    [ "${lines[1]}" = "x,y,z" ]
 }
 
-@test "word: path with slash separators" {
-    run bash -c 'printf "/usr/local/bin/bash\n/usr/local/bin/dash" | "$1" -w' -- "$SGDITTO"
+@test "sep comma: all tokens match" {
+    run bash -c 'printf "a,b,c\na,b,c" | "$1" -s ","' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "     " ]
+}
+
+@test "sep comma: curr has more tokens" {
+    run bash -c 'printf "a,b\na,b,c" | "$1" -s ","' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "   ,c" ]
+}
+
+@test "sep comma: curr has fewer tokens" {
+    run bash -c 'printf "a,b,c\na,b" | "$1" -s ","' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "   " ]
+}
+
+@test "sep comma: three lines chained" {
+    run bash -c 'printf "a,b,c\na,b,d\na,x,y" | "$1" -s ","' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "a,b,c" ]
+    [ "${lines[1]}" = "    d" ]
+    [ "${lines[2]}" = "  x,y" ]
+}
+
+@test "sep comma: empty tokens (consecutive separators)" {
+    run bash -c 'printf "a,,b\na,,c" | "$1" -s ","' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "   c" ]
+}
+
+@test "sep comma: leading separator" {
+    run bash -c 'printf ",a,b\n,a,c" | "$1" -s ","' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "   c" ]
+}
+
+# ── Separator mode: slash (paths) ──────────────────────────────
+
+@test "sep slash: path prefix" {
+    run bash -c 'printf "/usr/local/bin/bash\n/usr/local/bin/dash" | "$1" -s "/"' -- "$SGDITTO"
     [ "$status" -eq 0 ]
     [ "${lines[1]}" = "               dash" ]
 }
 
-@test "word: no matching words" {
-    run bash -c 'printf "hello world\ngoodbye earth" | "$1" -w' -- "$SGDITTO"
+@test "sep slash: diverging paths" {
+    run bash -c 'printf "/usr/local/bin/bash\n/usr/local/sbin/zsh" | "$1" -s "/"' -- "$SGDITTO"
     [ "$status" -eq 0 ]
-    [ "${lines[1]}" = "goodbye earth" ]
+    [ "${lines[1]}" = "           sbin/zsh" ]
 }
 
-@test "word: all words match" {
-    run bash -c 'printf "foo bar\nfoo bar" | "$1" -w' -- "$SGDITTO"
-    [ "$status" -eq 0 ]
-    [ "${lines[1]}" = "       " ]
+# ── Separator mode: tab (TSV) ──────────────────────────────────
+
+@test "sep tab: matching columns" {
+    result=$(printf "name\tcity\tage\nname\tcity\tscore" | "$SGDITTO" -s $'\t')
+    expected=$(printf "name\tcity\tage\n          score")
+    [ "$result" = "$expected" ]
 }
 
-@test "word: word chars vs non-word treats differently than char mode" {
-    # In char mode "foobar" vs "foobaz" matches prefix "fooba"
-    # In word mode "foobar" is one token, doesn't match "foobaz"
-    run bash -c 'printf "foobar\nfoobaz" | "$1" -w' -- "$SGDITTO"
+# ── Separator mode: multiple separators ─────────────────────────
+
+@test "sep multi: colon and pipe" {
+    run bash -c 'printf "a:b|c\na:b|d" | "$1" -s ":|"' -- "$SGDITTO"
     [ "$status" -eq 0 ]
-    [ "${lines[1]}" = "foobaz" ]
+    [ "${lines[1]}" = "    d" ]
 }
 
-@test "word: punctuation as separate tokens" {
-    run bash -c 'printf "foo.bar\nfoo.baz" | "$1" -w' -- "$SGDITTO"
+@test "sep multi: comma and semicolon" {
+    run bash -c 'printf "a,b;c\na,b;d" | "$1" -s ",;"' -- "$SGDITTO"
     [ "$status" -eq 0 ]
-    # tokens: foo . bar vs foo . baz → foo and . match, bar vs baz mismatch
-    [ "${lines[1]}" = "    baz" ]
+    [ "${lines[1]}" = "    d" ]
 }
 
-# ── Big word mode (-W) ──────────────────────────────────────────
-
-@test "WORD: matching token prefix in log lines" {
-    run bash -c 'printf "ERROR server1 connection timeout\nERROR server1 connection refused" | "$1" -W' -- "$SGDITTO"
+@test "sep multi: different seps at same position still match" {
+    # prev uses , but curr uses ; at same position — both are separators
+    run bash -c 'printf "a,b\na;c" | "$1" -s ",;"' -- "$SGDITTO"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "ERROR server1 connection timeout" ]
-    [ "${lines[1]}" = "                         refused" ]
+    [ "${lines[1]}" = "  c" ]
 }
 
-@test "WORD: no matching tokens" {
-    run bash -c 'printf "foo bar\nbaz qux" | "$1" -W' -- "$SGDITTO"
+# ── Keep-sep mode (-k) ─────────────────────────────────────────
+
+@test "keep-sep: commas preserved" {
+    run bash -c 'printf "John,Smith,42\nJohn,Smith,35" | "$1" -s "," -k' -- "$SGDITTO"
     [ "$status" -eq 0 ]
-    [ "${lines[1]}" = "baz qux" ]
+    [ "${lines[1]}" = "    ,     ,35" ]
 }
 
-@test "WORD: all tokens match" {
-    run bash -c 'printf "foo bar baz\nfoo bar baz" | "$1" -W' -- "$SGDITTO"
+@test "keep-sep: slashes preserved" {
+    run bash -c 'printf "/usr/local/bin/bash\n/usr/local/bin/dash" | "$1" -s "/" -k' -- "$SGDITTO"
     [ "$status" -eq 0 ]
-    [ "${lines[1]}" = "           " ]
+    [ "${lines[1]}" = "/   /     /   /dash" ]
 }
 
-@test "WORD: punctuation is part of token" {
-    # In WORD mode, "foo.bar" is one token
-    run bash -c 'printf "foo.bar baz\nfoo.bar qux" | "$1" -W' -- "$SGDITTO"
-    [ "$status" -eq 0 ]
-    [ "${lines[1]}" = "        qux" ]
+@test "keep-sep: tabs preserved" {
+    result=$(printf "name\tcity\tage\nname\tcity\tscore" | "$SGDITTO" -s $'\t' -k)
+    expected=$(printf "name\tcity\tage\n    \t    \tscore")
+    [ "$result" = "$expected" ]
 }
 
-@test "WORD: three lines chained" {
-    run bash -c 'printf "ERROR server1 connection timeout\nERROR server1 connection refused\nERROR server2 disk full" | "$1" -W' -- "$SGDITTO"
+@test "keep-sep: all tokens match" {
+    run bash -c 'printf "a,b,c\na,b,c" | "$1" -s "," -k' -- "$SGDITTO"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "ERROR server1 connection timeout" ]
-    [ "${lines[1]}" = "                         refused" ]
-    [ "${lines[2]}" = "      server2 disk full" ]
+    [ "${lines[1]}" = " , , " ]
 }
 
-@test "WORD: curr has more tokens than prev" {
-    run bash -c 'printf "a b\na b c" | "$1" -W' -- "$SGDITTO"
+@test "keep-sep: no match prints line as-is" {
+    run bash -c 'printf "a,b\nx,y" | "$1" -s "," -k' -- "$SGDITTO"
     [ "$status" -eq 0 ]
-    [ "${lines[1]}" = "    c" ]
-}
-
-@test "WORD: curr has fewer tokens than prev" {
-    run bash -c 'printf "a b c\na b" | "$1" -W' -- "$SGDITTO"
-    [ "$status" -eq 0 ]
-    [ "${lines[1]}" = "   " ]
+    [ "${lines[1]}" = "x,y" ]
 }
 
 # ── CLI options ─────────────────────────────────────────────────
@@ -175,7 +207,7 @@ setup() {
 @test "version flag shows version" {
     run "$SGDITTO" -V
     [ "$status" -eq 0 ]
-    [[ "$output" == *"0.1.0"* ]]
+    [[ "$output" == *"0.2.0"* ]]
 }
 
 @test "invalid flag returns error" {
@@ -186,7 +218,7 @@ setup() {
 
 @test "reads from file argument" {
     tmpfile=$(mktemp)
-    printf "abc\nabd" > "$tmpfile"
+    printf "abc\nabd\n" > "$tmpfile"
     run "$SGDITTO" "$tmpfile"
     rm -f "$tmpfile"
     [ "$status" -eq 0 ]
@@ -204,6 +236,12 @@ setup() {
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "abc" ]
     [ "${lines[1]}" = "  d" ]
+}
+
+@test "-s missing argument gives error" {
+    run "$SGDITTO" -s
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"requires an argument"* ]]
 }
 
 # ── Edge cases ──────────────────────────────────────────────────
@@ -225,4 +263,16 @@ setup() {
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "" ]
     [ "${lines[1]}" = "" ]
+}
+
+@test "sep mode: empty input" {
+    run bash -c 'printf "" | "$1" -s ","' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "$output" = "" ]
+}
+
+@test "sep mode: single line unchanged" {
+    run bash -c 'printf "a,b,c" | "$1" -s ","' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "$output" = "a,b,c" ]
 }

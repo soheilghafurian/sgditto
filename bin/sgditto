@@ -1,30 +1,36 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.1.0"
+VERSION="0.2.0"
 PROGNAME="${0##*/}"
-MODE="char"
+SEP=""
+KEEP_SEP=0
 
 usage() {
     cat <<EOF
-Usage: $PROGNAME [-c|-w|-W] [-h] [-V] [FILE...]
+Usage: $PROGNAME [-s SEP] [-k] [-h] [-V] [FILE...]
 
 Suppress repeated leading content in consecutive lines by replacing
 matching prefixes with spaces, making differences easy to spot.
 
 Options:
-  -c          Character mode (default): compare char-by-char
-  -w          Word mode (small words, like vim 'w')
-  -W          WORD mode (big words, whitespace-delimited, like vim 'W')
-  -h, --help  Show this help message
+  -s SEP         Split lines by separator characters in SEP.
+                 Each character in SEP is an independent separator.
+                 Default: '' (empty = character-by-character comparison).
+                 Supports escapes: \\t (tab), \\n (newline), \\\\ (backslash).
+  -k, --keep-sep Keep separator characters visible in the blanked prefix.
+                 By default, separators are replaced with spaces too.
+  -h, --help     Show this help message
   -V, --version  Show version
 
 If no FILE is given, reads from stdin. Use - for explicit stdin.
 
 Examples:
   ls /usr/local/bin | $PROGNAME
-  $PROGNAME -W logfile.txt
-  diff -u a.txt b.txt | $PROGNAME -w
+  $PROGNAME -s ',' data.csv
+  $PROGNAME -s '/' -k /etc/paths
+  $PROGNAME -s \$'\\t' data.tsv
+  $PROGNAME -s ':|' mixed.log
 EOF
 }
 
@@ -32,9 +38,13 @@ EOF
 FILES=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -c) MODE="char"; shift ;;
-        -w) MODE="word"; shift ;;
-        -W) MODE="WORD"; shift ;;
+        -s|--sep)
+            if [[ $# -lt 2 ]]; then
+                echo "$PROGNAME: option $1 requires an argument" >&2
+                exit 1
+            fi
+            SEP="$2"; shift 2 ;;
+        -k|--keep-sep) KEEP_SEP=1; shift ;;
         -h|--help) usage; exit 0 ;;
         -V|--version) echo "$PROGNAME $VERSION"; exit 0 ;;
         --) shift; FILES+=("$@"); break ;;
@@ -59,11 +69,16 @@ feed_input() {
     done
 }
 
-feed_input | awk -v mode="$MODE" '
+# Note: awk -v interprets escape sequences (\t → tab, \n → newline, \\ → \)
+feed_input | awk -v sep="$SEP" -v keep_sep="$KEEP_SEP" '
 function make_spaces(n,    fmt) {
     if (n <= 0) return ""
     fmt = "%" n "s"
     return sprintf(fmt, "")
+}
+
+function is_sep(ch) {
+    return (sep != "" && index(sep, ch) > 0)
 }
 
 function char_ditto(prev, curr,    len_p, len_c, min_len, i) {
@@ -77,98 +92,78 @@ function char_ditto(prev, curr,    len_p, len_c, min_len, i) {
     return min_len
 }
 
-function word_ditto(prev, curr,    len_p, len_c, i_p, i_c, start_c, tok_p, tok_c, ch) {
+function sep_process(prev, curr,    len_p, len_c, i_p, i_c, tok_start_c, tok_p, tok_c, result, i, ch) {
     len_p = length(prev)
     len_c = length(curr)
     i_p = 1; i_c = 1
+
     while (1) {
-        # Skip whitespace in both
-        while (i_p <= len_p && substr(prev, i_p, 1) ~ /[ \t]/) i_p++
-        while (i_c <= len_c && substr(curr, i_c, 1) ~ /[ \t]/) i_c++
-        if (i_p > len_p || i_c > len_c) break
-        start_c = i_c
+        tok_start_c = i_c
 
-        # Extract token from prev (word chars or single non-word char)
-        ch = substr(prev, i_p, 1)
-        if (ch ~ /[a-zA-Z0-9_]/) {
-            tok_p = ""
-            while (i_p <= len_p && substr(prev, i_p, 1) ~ /[a-zA-Z0-9_]/) {
-                tok_p = tok_p substr(prev, i_p, 1); i_p++
-            }
-        } else {
-            tok_p = ch; i_p++
-        }
-
-        # Extract token from curr
-        ch = substr(curr, i_c, 1)
-        if (ch ~ /[a-zA-Z0-9_]/) {
-            tok_c = ""
-            while (i_c <= len_c && substr(curr, i_c, 1) ~ /[a-zA-Z0-9_]/) {
-                tok_c = tok_c substr(curr, i_c, 1); i_c++
-            }
-        } else {
-            tok_c = ch; i_c++
-        }
-
-        if (tok_p != tok_c) return start_c - 1
-    }
-    # If curr has remaining tokens that prev does not, stop blanking
-    if (i_c <= len_c) {
-        while (i_c <= len_c && substr(curr, i_c, 1) ~ /[ \t]/) i_c++
-        if (i_c <= len_c) return i_c - 1
-    }
-    return length(curr)
-}
-
-function bigword_ditto(prev, curr,    len_p, len_c, i_p, i_c, start_c, tok_p, tok_c) {
-    len_p = length(prev)
-    len_c = length(curr)
-    i_p = 1; i_c = 1
-    while (1) {
-        # Skip whitespace in both
-        while (i_p <= len_p && substr(prev, i_p, 1) ~ /[ \t]/) i_p++
-        while (i_c <= len_c && substr(curr, i_c, 1) ~ /[ \t]/) i_c++
-        if (i_p > len_p || i_c > len_c) break
-        start_c = i_c
-
-        # Extract whitespace-delimited token from prev
+        # Extract token from prev (chars until separator or end)
         tok_p = ""
-        while (i_p <= len_p && substr(prev, i_p, 1) !~ /[ \t]/) {
+        while (i_p <= len_p && !is_sep(substr(prev, i_p, 1))) {
             tok_p = tok_p substr(prev, i_p, 1); i_p++
         }
 
-        # Extract whitespace-delimited token from curr
+        # Extract token from curr
         tok_c = ""
-        while (i_c <= len_c && substr(curr, i_c, 1) !~ /[ \t]/) {
+        while (i_c <= len_c && !is_sep(substr(curr, i_c, 1))) {
             tok_c = tok_c substr(curr, i_c, 1); i_c++
         }
 
-        if (tok_p != tok_c) return start_c - 1
+        # Compare tokens
+        if (tok_p != tok_c) {
+            # Mismatch: output blanked prefix + rest of curr
+            if (keep_sep) {
+                result = ""
+                for (i = 1; i < tok_start_c; i++) {
+                    ch = substr(curr, i, 1)
+                    result = result (is_sep(ch) ? ch : " ")
+                }
+                return result substr(curr, tok_start_c)
+            }
+            return make_spaces(tok_start_c - 1) substr(curr, tok_start_c)
+        }
+
+        # Tokens match — check for separators after them
+        if (i_p <= len_p && is_sep(substr(prev, i_p, 1)) && \
+            i_c <= len_c && is_sep(substr(curr, i_c, 1))) {
+            # Both have a separator; consume it and continue
+            i_p++; i_c++
+        } else {
+            # One or both exhausted, or no separator follows
+            break
+        }
     }
-    if (i_c <= len_c) {
-        while (i_c <= len_c && substr(curr, i_c, 1) ~ /[ \t]/) i_c++
-        if (i_c <= len_c) return i_c - 1
+
+    # All compared tokens matched — blank the matched portion of curr
+    if (keep_sep) {
+        result = ""
+        for (i = 1; i < i_c; i++) {
+            ch = substr(curr, i, 1)
+            result = result (is_sep(ch) ? ch : " ")
+        }
+        return result substr(curr, i_c)
     }
-    return length(curr)
+    return make_spaces(i_c - 1) substr(curr, i_c)
 }
 
 {
     if (NR == 1) {
         print
     } else {
-        if (mode == "char")
+        if (sep == "") {
             ditto_len = char_ditto(prev, $0)
-        else if (mode == "word")
-            ditto_len = word_ditto(prev, $0)
-        else
-            ditto_len = bigword_ditto(prev, $0)
-
-        if (ditto_len <= 0)
-            print
-        else if (ditto_len >= length($0))
-            print make_spaces(length($0))
-        else
-            print make_spaces(ditto_len) substr($0, ditto_len + 1)
+            if (ditto_len <= 0)
+                print
+            else if (ditto_len >= length($0))
+                print make_spaces(length($0))
+            else
+                print make_spaces(ditto_len) substr($0, ditto_len + 1)
+        } else {
+            print sep_process(prev, $0)
+        }
     }
     prev = $0
 }
