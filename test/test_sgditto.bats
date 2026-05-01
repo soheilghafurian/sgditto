@@ -164,36 +164,108 @@ setup() {
     [ "${lines[1]}" = "  c" ]
 }
 
-# ── Keep-sep mode (-k) ─────────────────────────────────────────
+# ── Keep-sep mode: all (-k / -k all / -k a) ───────────────────
 
-@test "keep-sep: commas preserved" {
+@test "keep-sep all: commas preserved" {
     run bash -c 'printf "John,Smith,42\nJohn,Smith,35" | "$1" -s "," -k' -- "$SGDITTO"
     [ "$status" -eq 0 ]
     [ "${lines[1]}" = "    ,     ,35" ]
 }
 
-@test "keep-sep: slashes preserved" {
+@test "keep-sep all: slashes preserved" {
     run bash -c 'printf "/usr/local/bin/bash\n/usr/local/bin/dash" | "$1" -s "/" -k' -- "$SGDITTO"
     [ "$status" -eq 0 ]
     [ "${lines[1]}" = "/   /     /   /dash" ]
 }
 
-@test "keep-sep: tabs preserved" {
+@test "keep-sep all: tabs preserved" {
     result=$(printf "name\tcity\tage\nname\tcity\tscore" | "$SGDITTO" -s $'\t' -k)
     expected=$(printf "name\tcity\tage\n    \t    \tscore")
     [ "$result" = "$expected" ]
 }
 
-@test "keep-sep: all tokens match" {
+@test "keep-sep all: all tokens match" {
     run bash -c 'printf "a,b,c\na,b,c" | "$1" -s "," -k' -- "$SGDITTO"
     [ "$status" -eq 0 ]
     [ "${lines[1]}" = " , , " ]
 }
 
-@test "keep-sep: no match prints line as-is" {
+@test "keep-sep all: no match prints line as-is" {
     run bash -c 'printf "a,b\nx,y" | "$1" -s "," -k' -- "$SGDITTO"
     [ "$status" -eq 0 ]
     [ "${lines[1]}" = "x,y" ]
+}
+
+@test "keep-sep all: explicit 'all' same as bare -k" {
+    run bash -c 'printf "John,Smith,42\nJohn,Smith,35" | "$1" -s "," -k all' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "    ,     ,35" ]
+}
+
+@test "keep-sep all: shortcut 'a' same as bare -k" {
+    run bash -c 'printf "John,Smith,42\nJohn,Smith,35" | "$1" -s "," -k a' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "    ,     ,35" ]
+}
+
+# ── Keep-sep mode: last (-k last / -k l) ──────────────────────
+
+@test "keep-sep last: only last comma kept" {
+    run bash -c 'printf "John,Smith,42\nJohn,Smith,35" | "$1" -s "," -k last' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "          ,35" ]
+}
+
+@test "keep-sep last: only last slash kept" {
+    run bash -c 'printf "/usr/local/bin/bash\n/usr/local/bin/dash" | "$1" -s "/" -k last' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "              /dash" ]
+}
+
+@test "keep-sep last: shortcut 'l' works" {
+    run bash -c 'printf "John,Smith,42\nJohn,Smith,35" | "$1" -s "," -k l' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "          ,35" ]
+}
+
+@test "keep-sep last: single separator" {
+    run bash -c 'printf "a,b\na,c" | "$1" -s "," -k last' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = " ,c" ]
+}
+
+@test "keep-sep last: no match prints line as-is" {
+    run bash -c 'printf "a,b\nx,y" | "$1" -s "," -k last' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "x,y" ]
+}
+
+@test "keep-sep last: all tokens match" {
+    run bash -c 'printf "a,b,c\na,b,c" | "$1" -s "," -k last' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "   , " ]
+}
+
+@test "keep-sep last: three lines chained" {
+    run bash -c 'printf "a,b,c\na,b,d\na,x,y" | "$1" -s "," -k last' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "a,b,c" ]
+    [ "${lines[1]}" = "   ,d" ]
+    [ "${lines[2]}" = " ,x,y" ]
+}
+
+# ── Keep-sep mode: none (-k none / -k n) ──────────────────────
+
+@test "keep-sep none: same as no -k flag" {
+    run bash -c 'printf "John,Smith,42\nJohn,Smith,35" | "$1" -s "," -k none' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "           35" ]
+}
+
+@test "keep-sep none: shortcut 'n' works" {
+    run bash -c 'printf "John,Smith,42\nJohn,Smith,35" | "$1" -s "," -k n' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[1]}" = "           35" ]
 }
 
 # ── CLI options ─────────────────────────────────────────────────
@@ -321,11 +393,18 @@ setup() {
     [ "${lines[1]}" = "      xyz" ]
 }
 
-@test "keep-sep: emoji prefix with separators preserved" {
+@test "keep-sep all: emoji prefix with separators preserved" {
     run bash -c 'printf "✅ a:b:c\n✅ a:b:z\n" | "$1" -s ":" -k' -- "$SGDITTO"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "✅ a:b:c" ]
     [ "${lines[1]}" = "    : :z" ]
+}
+
+@test "keep-sep last: emoji prefix only last separator kept" {
+    run bash -c 'printf "✅ a:b:c\n✅ a:b:z\n" | "$1" -s ":" -k last' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "✅ a:b:c" ]
+    [ "${lines[1]}" = "      :z" ]
 }
 
 @test "char: emoji entire line match" {

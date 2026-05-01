@@ -52,13 +52,13 @@ brew uninstall sgditto       # if installed via Homebrew
 ## Usage
 
 ```
-sgditto [-s SEP] [-k] [-h] [-V] [FILE...]
+sgditto [-s SEP] [-k [MODE]] [-h] [-V] [FILE...]
 ```
 
 | Option | Description |
 |--------|-------------|
 | `-s SEP` | Split lines by separator characters in SEP. Each character in SEP is an independent separator. Default: `''` (character-by-character comparison). |
-| `-k`, `--keep-sep` | Keep separator characters visible in the blanked prefix. By default, separators are replaced with spaces too. |
+| `-k`, `--keep-sep` `[MODE]` | Control which separators stay visible in the blanked prefix. MODE: `n`/`none` (replace all, default without `-k`), `l`/`last` (keep only the last separator), `a`/`all` (keep all separators). Bare `-k` defaults to `all`. |
 | `-h`, `--help` | Show help |
 | `-V`, `--version` | Show version |
 
@@ -118,7 +118,9 @@ host2:9090|ok
 
 ### Keep separators visible (`-k`)
 
-By default, separators in the matching prefix are replaced with spaces. Use `-k` to keep them, which helps maintain visual structure:
+By default, separators in the matching prefix are replaced with spaces. Use `-k` to keep some or all of them, which helps maintain visual structure.
+
+#### Keep all separators (`-k` or `-k all`)
 
 ```
 $ printf "John,Smith,42\nJohn,Smith,35\nJohn,Doe,28\n" | sgditto -s ',' -k
@@ -131,6 +133,23 @@ John,Smith,42
 $ printf "/usr/local/bin/bash\n/usr/local/bin/dash\n" | sgditto -s '/' -k
 /usr/local/bin/bash
 /   /     /   /dash
+```
+
+#### Keep only the last separator (`-k last`)
+
+Keeps just the separator before the first difference, giving a lighter visual anchor:
+
+```
+$ printf "John,Smith,42\nJohn,Smith,35\nJohn,Doe,28\n" | sgditto -s ',' -k last
+John,Smith,42
+          ,35
+    ,Doe,28
+```
+
+```
+$ printf "/usr/local/bin/bash\n/usr/local/bin/dash\n" | sgditto -s '/' -k last
+/usr/local/bin/bash
+              /dash
 ```
 
 ## Examples
@@ -156,7 +175,8 @@ find . -name "*.go" | sort | sgditto -s '/'
 ### CSV diffs with structure
 
 ```bash
-sgditto -s ',' -k data.csv
+sgditto -s ',' -k data.csv        # keep all separators
+sgditto -s ',' -k last data.csv   # keep only the last separator
 ```
 
 ## Running tests

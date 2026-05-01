@@ -12,11 +12,14 @@ Bash+awk CLI tool that suppresses repeated leading content in consecutive lines.
 
 ## CLI
 
-`sgditto [-s SEP] [-k] [-h] [-V] [FILE...]`
+`sgditto [-s SEP] [-k [MODE]] [-h] [-V] [FILE...]`
 
 - Default (no `-s`): character-by-character comparison
 - `-s SEP`: split by separator chars (e.g. `-s ','` for CSV, `-s '/'` for paths)
-- `-k`: keep separators visible in blanked prefix
+- `-k [MODE]`: control separator visibility in blanked prefix
+  - `n`/`none`: replace all separators with spaces (default without `-k`)
+  - `l`/`last`: keep only the last separator in the blanked prefix
+  - `a`/`all`: keep all separators (default when `-k` is given without MODE)
 
 ## Development
 

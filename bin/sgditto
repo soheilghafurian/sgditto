@@ -4,11 +4,11 @@ set -euo pipefail
 VERSION="0.2.0"
 PROGNAME="${0##*/}"
 SEP=""
-KEEP_SEP=0
+KEEP_SEP="none"
 
 usage() {
     cat <<EOF
-Usage: $PROGNAME [-s SEP] [-k] [-h] [-V] [FILE...]
+Usage: $PROGNAME [-s SEP] [-k [MODE]] [-h] [-V] [FILE...]
 
 Suppress repeated leading content in consecutive lines by replacing
 matching prefixes with spaces, making differences easy to spot.
@@ -18,8 +18,13 @@ Options:
                  Each character in SEP is an independent separator.
                  Default: '' (empty = character-by-character comparison).
                  Supports escapes: \\t (tab), \\n (newline), \\\\ (backslash).
-  -k, --keep-sep Keep separator characters visible in the blanked prefix.
-                 By default, separators are replaced with spaces too.
+  -k, --keep-sep [MODE]
+                 Control which separators stay visible in the blanked prefix.
+                 MODE is one of:
+                   n, none  — replace all separators with spaces (default without -k)
+                   l, last  — keep only the last separator in the blanked prefix
+                   a, all   — keep all separators in the blanked prefix
+                 If -k is given without MODE, defaults to 'all'.
   -h, --help     Show this help message
   -V, --version  Show version
 
@@ -29,6 +34,7 @@ Examples:
   ls /usr/local/bin | $PROGNAME
   $PROGNAME -s ',' data.csv
   $PROGNAME -s '/' -k /etc/paths
+  $PROGNAME -s '/' -k last /etc/paths
   $PROGNAME -s \$'\\t' data.tsv
   $PROGNAME -s ':|' mixed.log
 EOF
@@ -44,7 +50,18 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             SEP="$2"; shift 2 ;;
-        -k|--keep-sep) KEEP_SEP=1; shift ;;
+        -k|--keep-sep)
+            if [[ $# -ge 2 ]]; then
+                case "$2" in
+                    none|n) KEEP_SEP="none"; shift 2 ;;
+                    last|l) KEEP_SEP="last"; shift 2 ;;
+                    all|a)  KEEP_SEP="all";  shift 2 ;;
+                    *)      KEEP_SEP="all";  shift ;;
+                esac
+            else
+                KEEP_SEP="all"; shift
+            fi
+            ;;
         -h|--help) usage; exit 0 ;;
         -V|--version) echo "$PROGNAME $VERSION"; exit 0 ;;
         --) shift; FILES+=("$@"); break ;;
@@ -195,10 +212,11 @@ function char_ditto(prev, curr,    len_p, len_c, min_len, i) {
     return min_len
 }
 
-function sep_process(prev, curr,    len_p, len_c, i_p, i_c, tok_start_c, tok_p, tok_c, result, i, ch) {
+function sep_process(prev, curr,    len_p, len_c, i_p, i_c, tok_start_c, tok_p, tok_c, last_sep_c, result, i, ch) {
     len_p = length(prev)
     len_c = length(curr)
     i_p = 1; i_c = 1
+    last_sep_c = 0
 
     while (1) {
         tok_start_c = i_c
@@ -214,21 +232,26 @@ function sep_process(prev, curr,    len_p, len_c, i_p, i_c, tok_start_c, tok_p, 
         }
 
         if (tok_p != tok_c) {
-            if (keep_sep)
+            if (keep_sep == "all")
                 return blank_keep_sep(curr, tok_start_c - 1) substr(curr, tok_start_c)
+            if (keep_sep == "last" && last_sep_c > 0)
+                return make_spaces(display_width_of(curr, last_sep_c - 1)) substr(curr, last_sep_c)
             return make_spaces(display_width_of(curr, tok_start_c - 1)) substr(curr, tok_start_c)
         }
 
         if (i_p <= len_p && is_sep(substr(prev, i_p, 1)) && \
             i_c <= len_c && is_sep(substr(curr, i_c, 1))) {
+            last_sep_c = i_c
             i_p++; i_c++
         } else {
             break
         }
     }
 
-    if (keep_sep)
+    if (keep_sep == "all")
         return blank_keep_sep(curr, i_c - 1) substr(curr, i_c)
+    if (keep_sep == "last" && last_sep_c > 0)
+        return make_spaces(display_width_of(curr, last_sep_c - 1)) substr(curr, last_sep_c, 1) make_spaces(display_width_of(curr, i_c - 1) - display_width_of(curr, last_sep_c)) substr(curr, i_c)
     return make_spaces(display_width_of(curr, i_c - 1)) substr(curr, i_c)
 }
 
