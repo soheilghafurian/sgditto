@@ -276,3 +276,61 @@ setup() {
     [ "$status" -eq 0 ]
     [ "$output" = "a,b,c" ]
 }
+
+# ── Unicode / wide character alignment ────────────────────────────
+
+@test "char: 3-byte emoji aligned correctly" {
+    run bash -c 'printf "✅ abc\n✅ xyz\n" | "$1"' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "✅ abc" ]
+    [ "${lines[1]}" = "   xyz" ]
+}
+
+@test "char: 4-byte emoji aligned correctly" {
+    run bash -c 'printf "🔴 abc\n🔴 xyz\n" | "$1"' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "🔴 abc" ]
+    [ "${lines[1]}" = "   xyz" ]
+}
+
+@test "sep: 3-byte emoji prefix aligned" {
+    run bash -c 'printf "✅ abc:def\n✅ abc:xyz\n" | "$1" -s ":"' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "✅ abc:def" ]
+    [ "${lines[1]}" = "       xyz" ]
+}
+
+@test "sep: 4-byte emoji prefix aligned" {
+    run bash -c 'printf "🔴 abc:def\n🔴 abc:xyz\n" | "$1" -s ":"' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "🔴 abc:def" ]
+    [ "${lines[1]}" = "       xyz" ]
+}
+
+@test "sep: mixed emoji lines stay independent" {
+    run bash -c 'printf "✅ abc:def\n🔴 abc:xyz\n" | "$1" -s ":"' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "✅ abc:def" ]
+    [ "${lines[1]}" = "🔴 abc:xyz" ]
+}
+
+@test "char: CJK wide characters aligned" {
+    run bash -c 'printf "日本語abc\n日本語xyz\n" | "$1"' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "日本語abc" ]
+    [ "${lines[1]}" = "      xyz" ]
+}
+
+@test "keep-sep: emoji prefix with separators preserved" {
+    run bash -c 'printf "✅ a:b:c\n✅ a:b:z\n" | "$1" -s ":" -k' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "✅ a:b:c" ]
+    [ "${lines[1]}" = "    : :z" ]
+}
+
+@test "char: emoji entire line match" {
+    run bash -c 'printf "✅ abc\n✅ abc\n" | "$1"' -- "$SGDITTO"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "✅ abc" ]
+    [ "${lines[1]}" = "      " ]
+}
