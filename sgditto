@@ -22,6 +22,22 @@ produced by `find .`), suitable for folding in vim with
   -s SEP   separator between path components (default: /); may be
            more than one character
   FILE     read paths from FILE instead of stdin (may repeat)
+
+Examples:
+  find . | sgditto
+      Tree of the current directory, ready to pipe into vim.
+
+  find . | sgditto > tree.txt && vim tree.txt
+      Save the tree, then in vim: :set foldmethod=indent
+
+  sgditto -i 4 < paths.txt
+      Use 4 spaces per level instead of the default 2.
+
+  sgditto -s '::' < paths.txt
+      Paths are separated by "::" instead of "/".
+
+  sgditto paths1.txt paths2.txt
+      Read paths from files instead of stdin.
 EOF
 }
 
