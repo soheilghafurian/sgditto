@@ -25,6 +25,39 @@ Input (`tests/data/01_basic_tree.txt`):
 Output:
 
 ```
+.
+  README.md
+  src
+    main.py
+    models
+      user.py
+    utils
+      helper.py
+      other.py
+  tests
+    test_main.py
+```
+
+## no dot slash prefix
+
+Input (`tests/data/02_no_dot_slash_prefix.txt`):
+
+```
+README.md
+src
+src/main.py
+src/models
+src/models/user.py
+src/utils
+src/utils/helper.py
+src/utils/other.py
+tests
+tests/test_main.py
+```
+
+Output:
+
+```
 README.md
 src
   main.py
@@ -35,4 +68,28 @@ src
     other.py
 tests
   test_main.py
+```
+
+## dot as root
+
+Input (`tests/data/03_dot_as_root.txt`):
+
+```
+.
+./README.md
+./src
+./src/main.py
+./src/utils
+./src/utils/helper.py
+```
+
+Output:
+
+```
+.
+  README.md
+  src
+    main.py
+    utils
+      helper.py
 ```

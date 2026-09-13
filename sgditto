@@ -1,67 +1,56 @@
-#!/usr/bin/env python3
-"""sgditto: turn a list of paths (e.g. `find .` output) into an
-indentation-based file tree that folds nicely in vim with
-`:set foldmethod=indent`.
-"""
-import argparse
-import sys
+#!/bin/sh
+# sgditto: turn a list of paths (e.g. `find .` output) into an
+# indentation-based file tree that folds nicely in vim with
+# `:set foldmethod=indent`.
+#
+# POSIX sh + awk + sort only -- no interpreter or package beyond what
+# ships on essentially any unix-like machine.
+set -eu
 
+indent_size=2
 
-def build_tree(lines):
-    tree = {}
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        parts = [p for p in line.split("/") if p not in ("", ".")]
-        node = tree
-        for part in parts:
-            node = node.setdefault(part, {})
-    return tree
+usage() {
+    cat <<'EOF'
+Usage: sgditto [-i N] [FILE...]
 
+Build an indentation-based file tree from a list of paths (as
+produced by `find .`), suitable for folding in vim with
+':set foldmethod=indent'.
 
-def emit(tree, indent, out):
-    def walk(node, depth):
-        for name in sorted(node, key=str.lower):
-            out.write(f"{indent * depth}{name}\n")
-            walk(node[name], depth + 1)
+  -i N   number of spaces per tree level (default: 2)
+  FILE   read paths from FILE instead of stdin (may repeat)
+EOF
+}
 
-    walk(tree, 0)
+while getopts "i:h" opt; do
+    case "$opt" in
+        i) indent_size=$OPTARG ;;
+        h) usage; exit 0 ;;
+        *) usage >&2; exit 1 ;;
+    esac
+done
+shift $((OPTIND - 1))
 
+cat "$@" | awk '
+{
+    line = $0
+    gsub(/^[ \t]+|[ \t]+$/, "", line)
+    if (line == "") next
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(
-        description=(
-            "Build an indentation-based file tree from a list of paths "
-            "(as produced by `find .`), suitable for folding in vim with "
-            "':set foldmethod=indent'."
-        )
-    )
-    parser.add_argument(
-        "files",
-        nargs="*",
-        help="files containing paths, one per line (default: stdin)",
-    )
-    parser.add_argument(
-        "-i",
-        "--indent-size",
-        type=int,
-        default=2,
-        help="number of spaces per tree level (default: 2)",
-    )
-    args = parser.parse_args(argv)
-
-    lines = []
-    if args.files:
-        for path in args.files:
-            with open(path) as f:
-                lines.extend(f.read().splitlines())
-    else:
-        lines.extend(sys.stdin.read().splitlines())
-
-    tree = build_tree(lines)
-    emit(tree, " " * args.indent_size, sys.stdout)
-
-
-if __name__ == "__main__":
-    main()
+    n = split(line, parts, "/")
+    prefix = ""
+    for (i = 1; i <= n; i++) {
+        if (parts[i] == "") continue
+        prefix = (prefix == "" ? parts[i] : prefix "/" parts[i])
+        print prefix
+    }
+}
+' | LC_ALL=C sort -u | LC_ALL=C sort -f | awk -v indent_size="$indent_size" '
+{
+    n = split($0, parts, "/")
+    depth = n - 1
+    pad = ""
+    for (i = 0; i < depth * indent_size; i++) pad = pad " "
+    print pad parts[n]
+}
+'
