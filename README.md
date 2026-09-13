@@ -59,6 +59,14 @@ Then in vim:
 See `sgditto -h` for all options (custom indent width, custom
 separator) and a full list of examples.
 
+## Formats
+
+- **Input: path list** — a flat, separator-delimited list of full
+  paths, one per line, exactly the shape `find` produces.
+- **Output: indent tree** — one path component per line, with depth
+  encoded purely as leading whitespace (no `tree`-style connector
+  characters), which is what makes it foldable in vim.
+
 ## Development
 
 Test fixtures live in `tests/data/`, expected output snapshots in

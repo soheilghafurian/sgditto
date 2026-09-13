@@ -6,6 +6,11 @@ I want to have a command `sgditto` that takes a list of full file and directory 
 
 The command begins as getting the output from the `find` command, but that is only the beginning and it will keep on expanding.
 
+## Terminology
+
+- **Input format: path list** — a flat, separator-delimited list of full paths, one per line, exactly the shape `find` produces. "Flat" because it carries no structure of its own; depth is implicit in each line's path.
+- **Output format: indent tree** — one path component (basename) per line, with depth encoded purely as leading whitespace, no connector characters. This is what makes it foldable in vim with `:set foldmethod=indent`.
+
 ## Functional requirements
 
 - [x] The main criteria for that output is that when it is piped to vim, one can do `:set foldmethod=indent` in vim and use vim folding commands to fold and navigate the tree.
