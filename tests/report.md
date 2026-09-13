@@ -139,3 +139,31 @@ Output:
 >>utils
 >>>helper.py
 ```
+
+## gron style
+
+Input (`tests/data/06_gron_style.txt`), command: `sgditto -g -s .`:
+
+```
+json = {};
+json.authors = [];
+json.authors[0] = "Soheil";
+json.config = {};
+json.config.indent = " ";
+json.config.separator = "/";
+json.name = "sgditto";
+json.version = "1.0";
+```
+
+Output:
+
+```
+json = {};
+  authors = [];
+  authors[0] = "Soheil";
+  config = {};
+    indent = " ";
+    separator = "/";
+  name = "sgditto";
+  version = "1.0";
+```

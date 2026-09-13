@@ -57,7 +57,7 @@ Then in vim:
 ```
 
 See `sgditto -h` for all options (custom indent string, custom repeat
-count, custom separator) and a full list of examples.
+count, custom separator, gron mode) and a full list of examples.
 
 ## Formats
 
@@ -66,6 +66,27 @@ count, custom separator) and a full list of examples.
 - **Output: indent tree** — one path component per line, with depth
   encoded purely as leading whitespace (no `tree`-style connector
   characters), which is what makes it foldable in vim.
+
+### Using it with gron
+
+[gron](https://github.com/tomnomnom/gron) is another common source of
+input: it turns JSON into lines of `path = value;`, e.g.
+`json.config.indent = " ";`. Pipe it straight into `sgditto -g -s .` —
+no preprocessing needed:
+
+```
+gron file.json | sgditto -g -s .
+```
+
+`-g` tells `sgditto` to split each line on the first `" = "`, use only
+the part before it to build the tree, and keep everything else
+(the value, `{}`/`[]` container markers, all of it) on that node's
+printed line, unchanged. Without `-g`, a value's text can itself
+contain the separator (e.g. `"1.0"`) and gets misread as extra path
+components — `-g` is what avoids that. Array indices like
+`authors[0]` are attached to their key without a separator, so they
+show up as siblings of the key they index into rather than nested
+under it — that's expected.
 
 ## Development
 

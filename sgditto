@@ -10,10 +10,11 @@ set -eu
 indent=" "
 repeat_count=2
 separator="/"
+gron_mode=0
 
 usage() {
     cat <<'EOF'
-Usage: sgditto [-i STR] [-n N] [-s SEP] [FILE...]
+Usage: sgditto [-i STR] [-n N] [-s SEP] [-g] [FILE...]
 
 Build an indentation-based file tree from a list of paths (as
 produced by `find .`), suitable for folding in vim with
@@ -26,6 +27,11 @@ produced by `find .`), suitable for folding in vim with
   -n N     number of times to repeat -i per tree level (default: 2)
   -s SEP   separator between path components (default: /); may be
            more than one character
+  -g       gron mode: each line is `path = value;` (as produced by
+           gron); only the path is used to build the tree, and the
+           " = value;" part is kept and printed after the leaf name
+           instead of being parsed as more path. Lines with no
+           " = " are treated as plain paths, same as without -g.
   FILE     read paths from FILE instead of stdin (may repeat)
 
 Examples:
@@ -45,16 +51,20 @@ Examples:
   sgditto -s '::' < paths.txt
       Paths are separated by "::" instead of "/".
 
+  gron file.json | sgditto -g -s .
+      Tree of a JSON file's structure, values kept on each leaf line.
+
   sgditto paths1.txt paths2.txt
       Read paths from files instead of stdin.
 EOF
 }
 
-while getopts "i:n:s:h" opt; do
+while getopts "i:n:s:gh" opt; do
     case "$opt" in
         i) indent=$OPTARG ;;
         n) repeat_count=$OPTARG ;;
         s) separator=$OPTARG ;;
+        g) gron_mode=1 ;;
         h) usage; exit 0 ;;
         *) usage >&2; exit 1 ;;
     esac
@@ -66,7 +76,7 @@ if [ -z "$separator" ]; then
     exit 1
 fi
 
-cat "$@" | awk -v sep="$separator" -v indent="$indent" -v repeat_count="$repeat_count" '
+cat "$@" | awk -v sep="$separator" -v indent="$indent" -v repeat_count="$repeat_count" -v gron_mode="$gron_mode" '
 function esc_re(s,    out, i, c, special) {
     special = "\\.^$*+?()[]{}|"
     out = ""
@@ -113,7 +123,7 @@ function emit(parentKey, depth,    i, k, pad) {
     pad = repeat(indent, depth * repeat_count)
     for (i = 1; i <= childCount[parentKey]; i++) {
         k = childOf[parentKey, i]
-        print pad name[k]
+        print pad name[k] suffix[k]
         emit(k, depth + 1)
     }
 }
@@ -125,6 +135,15 @@ BEGIN { sep_re = esc_re(sep) }
     gsub(/^[ \t]+|[ \t]+$/, "", line)
     if (line == "") next
 
+    lineSuffix = ""
+    if (gron_mode) {
+        eq = index(line, " = ")
+        if (eq > 0) {
+            lineSuffix = substr(line, eq)
+            line = substr(line, 1, eq - 1)
+        }
+    }
+
     n = split(line, parts, sep_re)
     parentKey = ""
     key = ""
@@ -132,6 +151,7 @@ BEGIN { sep_re = esc_re(sep) }
         if (parts[i] == "") continue
         key = key SUBSEP parts[i]
         add_node(key, parentKey, parts[i])
+        if (i == n) suffix[key] = lineSuffix
         parentKey = key
     }
 }
