@@ -119,7 +119,7 @@ root
 
 ## custom indent char
 
-Input (`tests/data/05_custom_indent_char.txt`), command: `sgditto -c > -i 1`:
+Input (`tests/data/05_custom_indent_char.txt`), command: `sgditto -i > -n 1`:
 
 ```
 ./README.md

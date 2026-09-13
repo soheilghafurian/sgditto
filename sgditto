@@ -7,23 +7,23 @@
 # on essentially any unix-like machine.
 set -eu
 
-indent_size=2
-indent_char=" "
+indent=" "
+repeat_count=2
 separator="/"
 
 usage() {
     cat <<'EOF'
-Usage: sgditto [-i N] [-c STR] [-s SEP] [FILE...]
+Usage: sgditto [-i STR] [-n N] [-s SEP] [FILE...]
 
 Build an indentation-based file tree from a list of paths (as
 produced by `find .`), suitable for folding in vim with
 ':set foldmethod=indent'.
 
-  -i N     number of indent units per tree level (default: 2)
-  -c STR   the indent unit itself (default: " ", a space); may be
+  -i STR   the indent string itself (default: " ", a space); may be
            more than one character. Note: vim's foldmethod=indent
            only recognizes actual whitespace (spaces/tabs) as indent,
-           so a non-whitespace -c will not fold in vim.
+           so a non-whitespace -i will not fold in vim.
+  -n N     number of times to repeat -i per tree level (default: 2)
   -s SEP   separator between path components (default: /); may be
            more than one character
   FILE     read paths from FILE instead of stdin (may repeat)
@@ -35,12 +35,12 @@ Examples:
   find . | sgditto > tree.txt && vim tree.txt
       Save the tree, then in vim: :set foldmethod=indent
 
-  sgditto -i 4 < paths.txt
+  sgditto -n 4 < paths.txt
       Use 4 spaces per level instead of the default 2.
 
-  sgditto -c '.' < paths.txt
-      Use "." as the indent unit instead of a space (for display
-      only -- this will not fold in vim; see the -c note above).
+  sgditto -i '.' < paths.txt
+      Use "." as the indent string instead of spaces (for display
+      only -- this will not fold in vim; see the -i note above).
 
   sgditto -s '::' < paths.txt
       Paths are separated by "::" instead of "/".
@@ -50,10 +50,10 @@ Examples:
 EOF
 }
 
-while getopts "i:c:s:h" opt; do
+while getopts "i:n:s:h" opt; do
     case "$opt" in
-        i) indent_size=$OPTARG ;;
-        c) indent_char=$OPTARG ;;
+        i) indent=$OPTARG ;;
+        n) repeat_count=$OPTARG ;;
         s) separator=$OPTARG ;;
         h) usage; exit 0 ;;
         *) usage >&2; exit 1 ;;
@@ -66,7 +66,7 @@ if [ -z "$separator" ]; then
     exit 1
 fi
 
-cat "$@" | awk -v sep="$separator" -v indent_size="$indent_size" -v indent_char="$indent_char" '
+cat "$@" | awk -v sep="$separator" -v indent="$indent" -v repeat_count="$repeat_count" '
 function esc_re(s,    out, i, c, special) {
     special = "\\.^$*+?()[]{}|"
     out = ""
@@ -110,7 +110,7 @@ function repeat(str, times,    out, i) {
 
 function emit(parentKey, depth,    i, k, pad) {
     sort_children(parentKey)
-    pad = repeat(indent_char, depth * indent_size)
+    pad = repeat(indent, depth * repeat_count)
     for (i = 1; i <= childCount[parentKey]; i++) {
         k = childOf[parentKey, i]
         print pad name[k]
