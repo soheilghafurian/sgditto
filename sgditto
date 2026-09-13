@@ -8,17 +8,22 @@
 set -eu
 
 indent_size=2
+indent_char=" "
 separator="/"
 
 usage() {
     cat <<'EOF'
-Usage: sgditto [-i N] [-s SEP] [FILE...]
+Usage: sgditto [-i N] [-c STR] [-s SEP] [FILE...]
 
 Build an indentation-based file tree from a list of paths (as
 produced by `find .`), suitable for folding in vim with
 ':set foldmethod=indent'.
 
-  -i N     number of spaces per tree level (default: 2)
+  -i N     number of indent units per tree level (default: 2)
+  -c STR   the indent unit itself (default: " ", a space); may be
+           more than one character. Note: vim's foldmethod=indent
+           only recognizes actual whitespace (spaces/tabs) as indent,
+           so a non-whitespace -c will not fold in vim.
   -s SEP   separator between path components (default: /); may be
            more than one character
   FILE     read paths from FILE instead of stdin (may repeat)
@@ -33,6 +38,10 @@ Examples:
   sgditto -i 4 < paths.txt
       Use 4 spaces per level instead of the default 2.
 
+  sgditto -c '.' < paths.txt
+      Use "." as the indent unit instead of a space (for display
+      only -- this will not fold in vim; see the -c note above).
+
   sgditto -s '::' < paths.txt
       Paths are separated by "::" instead of "/".
 
@@ -41,9 +50,10 @@ Examples:
 EOF
 }
 
-while getopts "i:s:h" opt; do
+while getopts "i:c:s:h" opt; do
     case "$opt" in
         i) indent_size=$OPTARG ;;
+        c) indent_char=$OPTARG ;;
         s) separator=$OPTARG ;;
         h) usage; exit 0 ;;
         *) usage >&2; exit 1 ;;
@@ -56,7 +66,7 @@ if [ -z "$separator" ]; then
     exit 1
 fi
 
-cat "$@" | awk -v sep="$separator" -v indent_size="$indent_size" '
+cat "$@" | awk -v sep="$separator" -v indent_size="$indent_size" -v indent_char="$indent_char" '
 function esc_re(s,    out, i, c, special) {
     special = "\\.^$*+?()[]{}|"
     out = ""
@@ -92,10 +102,15 @@ function sort_children(parentKey,    n, i, j, tmp) {
     }
 }
 
-function emit(parentKey, depth,    i, k, width, pad) {
+function repeat(str, times,    out, i) {
+    out = ""
+    for (i = 0; i < times; i++) out = out str
+    return out
+}
+
+function emit(parentKey, depth,    i, k, pad) {
     sort_children(parentKey)
-    width = depth * indent_size
-    pad = (width > 0) ? sprintf("%" width "s", "") : ""
+    pad = repeat(indent_char, depth * indent_size)
     for (i = 1; i <= childCount[parentKey]; i++) {
         k = childOf[parentKey, i]
         print pad name[k]

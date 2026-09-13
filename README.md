@@ -56,8 +56,8 @@ Then in vim:
 :set foldmethod=indent
 ```
 
-See `sgditto -h` for all options (custom indent width, custom
-separator) and a full list of examples.
+See `sgditto -h` for all options (custom indent width, custom indent
+unit, custom separator) and a full list of examples.
 
 ## Formats
 

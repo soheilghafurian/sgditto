@@ -16,6 +16,8 @@ The command begins as getting the output from the `find` command, but that is on
 - [x] The main criteria for that output is that when it is piped to vim, one can do `:set foldmethod=indent` in vim and use vim folding commands to fold and navigate the tree.
 - [x] The default options of the command must be such that it always works when the input is the output of the `find` command, like `find . | sgditto`. I shouldn't need to change any options from default when piping from `find .`.
 - [x] The command must work whether directory paths end with a `/` (separator) or not.
+- [x] The separator between path components must be configurable (default `/`), and may be more than one character.
+- [x] The indent unit — what gets repeated to build each level's indentation — must be configurable independently of how many units are used per level (default: a single space).
 
 ## Deliverables
 

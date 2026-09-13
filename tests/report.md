@@ -116,3 +116,26 @@ root
     utils
       helper.py
 ```
+
+## custom indent char
+
+Input (`tests/data/05_custom_indent_char.txt`), command: `sgditto -c > -i 1`:
+
+```
+./README.md
+./src
+./src/main.py
+./src/utils
+./src/utils/helper.py
+```
+
+Output:
+
+```
+.
+>README.md
+>src
+>>main.py
+>>utils
+>>>helper.py
+```
