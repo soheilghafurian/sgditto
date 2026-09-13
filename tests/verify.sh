@@ -14,6 +14,7 @@ fail=0
 for data_file in "$data_dir"/*.txt; do
     name="$(basename "$data_file" .txt)"
     expected_file="$expected_dir/$name.txt"
+    args_file="$data_dir/$name.args"
 
     if [[ ! -f "$expected_file" ]]; then
         echo "MISSING expected/$name.txt (no snapshot to compare against)"
@@ -21,7 +22,12 @@ for data_file in "$data_dir"/*.txt; do
         continue
     fi
 
-    if diff -u "$expected_file" <("$repo_root/sgditto" < "$data_file") > /tmp/sgditto_verify_diff.$$; then
+    args=()
+    if [[ -f "$args_file" ]]; then
+        read -r -a args < "$args_file"
+    fi
+
+    if diff -u "$expected_file" <("$repo_root/sgditto" "${args[@]}" < "$data_file") > /tmp/sgditto_verify_diff.$$; then
         echo "PASS $name"
     else
         echo "FAIL $name"

@@ -11,3 +11,4 @@ Each time a new feature is added, I want some raw test data to be added and then
 
 - Don't stage, commit, or push anything on your own unless told specfically.
 - The command should always have an up to date help option. The help must include a list of examples for the reader to use as a cheat sheet to remember stuff quickly.
+- The fefault options of the command must be so that it always works when the input is the output of the find command like this `find . | sgditto`. I shouldn't need to change any options from default when I'm piping from `find .`.

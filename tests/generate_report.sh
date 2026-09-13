@@ -20,11 +20,20 @@ report="$script_dir/report.md"
 for data_file in "$data_dir"/*.txt; do
     name="$(basename "$data_file" .txt)"
     title="$(echo "${name#*_}" | tr '_' ' ')"
+    args_file="$data_dir/$name.args"
+
+    args=()
+    cmd="sgditto"
+    if [[ -f "$args_file" ]]; then
+        read -r -a args < "$args_file"
+        cmd="sgditto $(cat "$args_file")"
+    fi
+
     {
         echo
         echo "## $title"
         echo
-        echo "Input (\`tests/data/$(basename "$data_file")\`):"
+        echo "Input (\`tests/data/$(basename "$data_file")\`), command: \`$cmd\`:"
         echo
         echo '```'
         cat "$data_file"
@@ -33,7 +42,7 @@ for data_file in "$data_dir"/*.txt; do
         echo "Output:"
         echo
         echo '```'
-        "$repo_root/sgditto" < "$data_file"
+        "$repo_root/sgditto" "${args[@]}" < "$data_file"
         echo '```'
     } >> "$report"
 done

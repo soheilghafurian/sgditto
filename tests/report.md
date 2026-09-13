@@ -7,7 +7,7 @@ builds from it.
 
 ## basic tree
 
-Input (`tests/data/01_basic_tree.txt`):
+Input (`tests/data/01_basic_tree.txt`), command: `sgditto`:
 
 ```
 ./README.md
@@ -40,7 +40,7 @@ Output:
 
 ## no dot slash prefix
 
-Input (`tests/data/02_no_dot_slash_prefix.txt`):
+Input (`tests/data/02_no_dot_slash_prefix.txt`), command: `sgditto`:
 
 ```
 README.md
@@ -72,7 +72,7 @@ tests
 
 ## dot as root
 
-Input (`tests/data/03_dot_as_root.txt`):
+Input (`tests/data/03_dot_as_root.txt`), command: `sgditto`:
 
 ```
 .
@@ -87,6 +87,29 @@ Output:
 
 ```
 .
+  README.md
+  src
+    main.py
+    utils
+      helper.py
+```
+
+## custom separator
+
+Input (`tests/data/04_custom_separator.txt`), command: `sgditto -s ::`:
+
+```
+root::README.md
+root::src
+root::src::main.py
+root::src::utils
+root::src::utils::helper.py
+```
+
+Output:
+
+```
+root
   README.md
   src
     main.py

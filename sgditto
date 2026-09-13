@@ -3,54 +3,107 @@
 # indentation-based file tree that folds nicely in vim with
 # `:set foldmethod=indent`.
 #
-# POSIX sh + awk + sort only -- no interpreter or package beyond what
-# ships on essentially any unix-like machine.
+# POSIX sh + awk only -- no interpreter or package beyond what ships
+# on essentially any unix-like machine.
 set -eu
 
 indent_size=2
+separator="/"
 
 usage() {
     cat <<'EOF'
-Usage: sgditto [-i N] [FILE...]
+Usage: sgditto [-i N] [-s SEP] [FILE...]
 
 Build an indentation-based file tree from a list of paths (as
 produced by `find .`), suitable for folding in vim with
 ':set foldmethod=indent'.
 
-  -i N   number of spaces per tree level (default: 2)
-  FILE   read paths from FILE instead of stdin (may repeat)
+  -i N     number of spaces per tree level (default: 2)
+  -s SEP   separator between path components (default: /); may be
+           more than one character
+  FILE     read paths from FILE instead of stdin (may repeat)
 EOF
 }
 
-while getopts "i:h" opt; do
+while getopts "i:s:h" opt; do
     case "$opt" in
         i) indent_size=$OPTARG ;;
+        s) separator=$OPTARG ;;
         h) usage; exit 0 ;;
         *) usage >&2; exit 1 ;;
     esac
 done
 shift $((OPTIND - 1))
 
-cat "$@" | awk '
+if [ -z "$separator" ]; then
+    echo "sgditto: separator must not be empty" >&2
+    exit 1
+fi
+
+cat "$@" | awk -v sep="$separator" -v indent_size="$indent_size" '
+function esc_re(s,    out, i, c, special) {
+    special = "\\.^$*+?()[]{}|"
+    out = ""
+    for (i = 1; i <= length(s); i++) {
+        c = substr(s, i, 1)
+        out = out (index(special, c) > 0 ? "\\" c : c)
+    }
+    return out
+}
+
+function add_node(key, parentKey, nodeName) {
+    if (key in known) return
+    known[key] = 1
+    name[key] = nodeName
+    childCount[parentKey]++
+    childOf[parentKey, childCount[parentKey]] = key
+}
+
+function lc(s) {
+    return tolower(s)
+}
+
+function sort_children(parentKey,    n, i, j, tmp) {
+    n = childCount[parentKey]
+    for (i = 2; i <= n; i++) {
+        j = i
+        while (j > 1 && lc(name[childOf[parentKey, j - 1]]) > lc(name[childOf[parentKey, j]])) {
+            tmp = childOf[parentKey, j]
+            childOf[parentKey, j] = childOf[parentKey, j - 1]
+            childOf[parentKey, j - 1] = tmp
+            j--
+        }
+    }
+}
+
+function emit(parentKey, depth,    i, k, width, pad) {
+    sort_children(parentKey)
+    width = depth * indent_size
+    pad = (width > 0) ? sprintf("%" width "s", "") : ""
+    for (i = 1; i <= childCount[parentKey]; i++) {
+        k = childOf[parentKey, i]
+        print pad name[k]
+        emit(k, depth + 1)
+    }
+}
+
+BEGIN { sep_re = esc_re(sep) }
+
 {
     line = $0
     gsub(/^[ \t]+|[ \t]+$/, "", line)
     if (line == "") next
 
-    n = split(line, parts, "/")
-    prefix = ""
+    n = split(line, parts, sep_re)
+    parentKey = ""
+    key = ""
     for (i = 1; i <= n; i++) {
         if (parts[i] == "") continue
-        prefix = (prefix == "" ? parts[i] : prefix "/" parts[i])
-        print prefix
+        key = key SUBSEP parts[i]
+        add_node(key, parentKey, parts[i])
+        parentKey = key
     }
 }
-' | LC_ALL=C sort -u | LC_ALL=C sort -f | awk -v indent_size="$indent_size" '
-{
-    n = split($0, parts, "/")
-    depth = n - 1
-    pad = ""
-    for (i = 0; i < depth * indent_size; i++) pad = pad " "
-    print pad parts[n]
-}
+
+END { emit("", 0) }
 '
