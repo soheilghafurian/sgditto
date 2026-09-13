@@ -1,0 +1,38 @@
+# sgditto test report
+
+Generated from the raw path lists in `tests/data/` by running
+`tests/generate_report.sh`. Each section shows the raw input
+(a path list, as `find .` would produce) and the tree sgditto
+builds from it.
+
+## basic tree
+
+Input (`tests/data/01_basic_tree.txt`):
+
+```
+./README.md
+./src
+./src/main.py
+./src/models
+./src/models/user.py
+./src/utils
+./src/utils/helper.py
+./src/utils/other.py
+./tests
+./tests/test_main.py
+```
+
+Output:
+
+```
+README.md
+src
+  main.py
+  models
+    user.py
+  utils
+    helper.py
+    other.py
+tests
+  test_main.py
+```
