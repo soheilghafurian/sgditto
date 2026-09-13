@@ -11,14 +11,20 @@ indent=" "
 repeat_count=2
 separator="/"
 gron_mode=0
+subcommand="tree"
 
 usage() {
     cat <<'EOF'
-Usage: sgditto [-i STR] [-n N] [-s SEP] [-g] [FILE...]
+Usage: sgditto [tree] [-i STR] [-n N] [-s SEP] [-g] [FILE...]
+       sgditto paths [-i STR] [-n N] [-s SEP] [-g] [FILE...]
 
-Build an indentation-based file tree from a list of paths (as
-produced by `find .`), suitable for folding in vim with
+tree (default): build an indentation-based file tree from a path
+list (as produced by `find .`), suitable for folding in vim with
 ':set foldmethod=indent'.
+
+paths: the reverse -- reconstruct a path list from an indentation
+tree (as produced by this command), using the same -i/-n/-s/-g given
+when the tree was built.
 
   -i STR   the indent string itself (default: " ", a space); may be
            more than one character. Note: vim's foldmethod=indent
@@ -28,11 +34,11 @@ produced by `find .`), suitable for folding in vim with
   -s SEP   separator between path components (default: /); may be
            more than one character
   -g       gron mode: each line is `path = value;` (as produced by
-           gron); only the path is used to build the tree, and the
-           " = value;" part is kept and printed after the leaf name
-           instead of being parsed as more path. Lines with no
-           " = " are treated as plain paths, same as without -g.
-  FILE     read paths from FILE instead of stdin (may repeat)
+           gron); only the path is used to build/read the tree, and
+           the " = value;" part is kept on the leaf line instead of
+           being parsed as more path. Lines with no " = " are
+           treated as plain paths, same as without -g.
+  FILE     read input from FILE instead of stdin (may repeat)
 
 Examples:
   find . | sgditto
@@ -54,10 +60,21 @@ Examples:
   gron file.json | sgditto -g -s .
       Tree of a JSON file's structure, values kept on each leaf line.
 
+  sgditto paths < tree.txt
+      Reconstruct the path list from a tree built with the defaults.
+
+  find . | sgditto -n 4 | sgditto paths -n 4
+      Round-trip: build a tree with 4-space indent, then reconstruct
+      the original path list from it -- both sides need the same -n.
+
   sgditto paths1.txt paths2.txt
       Read paths from files instead of stdin.
 EOF
 }
+
+case "${1:-}" in
+    tree|paths) subcommand=$1; shift ;;
+esac
 
 while getopts "i:n:s:gh" opt; do
     case "$opt" in
@@ -74,6 +91,48 @@ shift $((OPTIND - 1))
 if [ -z "$separator" ]; then
     echo "sgditto: separator must not be empty" >&2
     exit 1
+fi
+
+if [ "$subcommand" = paths ]; then
+    cat "$@" | awk -v sep="$separator" -v indent="$indent" -v repeat_count="$repeat_count" -v gron_mode="$gron_mode" '
+function count_indent(line,    k, ilen) {
+    ilen = length(indent)
+    if (ilen == 0) return 0
+    k = 0
+    while (substr(line, 1, ilen) == indent) {
+        line = substr(line, ilen + 1)
+        k++
+    }
+    return k
+}
+
+{
+    raw = $0
+    sub(/[ \t\r]+$/, "", raw)
+    if (raw == "") next
+
+    k = count_indent(raw)
+    depth = int(k / repeat_count)
+    rest = substr(raw, k * length(indent) + 1)
+
+    lineSuffix = ""
+    if (gron_mode) {
+        eq = index(rest, " = ")
+        if (eq > 0) {
+            lineSuffix = substr(rest, eq)
+            rest = substr(rest, 1, eq - 1)
+        }
+    }
+
+    stack[depth] = rest
+
+    path = stack[0]
+    for (d = 1; d <= depth; d++) path = path sep stack[d]
+
+    print path lineSuffix
+}
+'
+    exit 0
 fi
 
 cat "$@" | awk -v sep="$separator" -v indent="$indent" -v repeat_count="$repeat_count" -v gron_mode="$gron_mode" '

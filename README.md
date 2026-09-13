@@ -88,6 +88,32 @@ components — `-g` is what avoids that. Array indices like
 show up as siblings of the key they index into rather than nested
 under it — that's expected.
 
+### Reversing it: tree back to paths
+
+`sgditto paths` is the reverse of `sgditto` (or, spelled out,
+`sgditto tree`): it reads an indent tree and reconstructs the path
+list it came from. Give it the same `-i`/`-n`/`-s`/`-g` that were
+used to build the tree — it reads indentation back out using those,
+it doesn't guess:
+
+```
+find . | sgditto > tree.txt
+sgditto paths < tree.txt
+```
+
+Options must match on both sides, so a round trip looks like:
+
+```
+find . | sgditto -n 4 | sgditto paths -n 4
+```
+
+This also works with `-g`, reconstructing the exact original `gron`
+output:
+
+```
+gron file.json | sgditto -g -s . | sgditto paths -g -s .
+```
+
 ## Development
 
 Test fixtures live in `tests/data/`, expected output snapshots in

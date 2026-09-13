@@ -167,3 +167,113 @@ json = {};
   name = "sgditto";
   version = "1.0";
 ```
+
+## paths reverse
+
+Input (`tests/data/07_paths_reverse.txt`), command: `sgditto paths`:
+
+```
+.
+  README.md
+  src
+    main.py
+    models
+      user.py
+    utils
+      helper.py
+      other.py
+  tests
+    test_main.py
+```
+
+Output:
+
+```
+.
+./README.md
+./src
+./src/main.py
+./src/models
+./src/models/user.py
+./src/utils
+./src/utils/helper.py
+./src/utils/other.py
+./tests
+./tests/test_main.py
+```
+
+## paths reverse gron
+
+Input (`tests/data/08_paths_reverse_gron.txt`), command: `sgditto paths -g -s .`:
+
+```
+json = {};
+  authors = [];
+  authors[0] = "Soheil";
+  config = {};
+    indent = " ";
+    separator = "/";
+  name = "sgditto";
+  version = "1.0";
+```
+
+Output:
+
+```
+json = {};
+json.authors = [];
+json.authors[0] = "Soheil";
+json.config = {};
+json.config.indent = " ";
+json.config.separator = "/";
+json.name = "sgditto";
+json.version = "1.0";
+```
+
+## paths reverse custom separator
+
+Input (`tests/data/09_paths_reverse_custom_separator.txt`), command: `sgditto paths -s ::`:
+
+```
+root
+  README.md
+  src
+    main.py
+    utils
+      helper.py
+```
+
+Output:
+
+```
+root
+root::README.md
+root::src
+root::src::main.py
+root::src::utils
+root::src::utils::helper.py
+```
+
+## paths reverse custom indent
+
+Input (`tests/data/10_paths_reverse_custom_indent.txt`), command: `sgditto paths -i > -n 1`:
+
+```
+.
+>README.md
+>src
+>>main.py
+>>utils
+>>>helper.py
+```
+
+Output:
+
+```
+.
+./README.md
+./src
+./src/main.py
+./src/utils
+./src/utils/helper.py
+```

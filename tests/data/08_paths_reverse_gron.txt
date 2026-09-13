@@ -1,0 +1,8 @@
+json = {};
+  authors = [];
+  authors[0] = "Soheil";
+  config = {};
+    indent = " ";
+    separator = "/";
+  name = "sgditto";
+  version = "1.0";
