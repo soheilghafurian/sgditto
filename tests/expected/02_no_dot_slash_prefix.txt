@@ -1,10 +1,10 @@
 README.md
 src
-  main.py
-  models
-    user.py
-  utils
-    helper.py
-    other.py
+    main.py
+    models
+        user.py
+    utils
+        helper.py
+        other.py
 tests
-  test_main.py
+    test_main.py

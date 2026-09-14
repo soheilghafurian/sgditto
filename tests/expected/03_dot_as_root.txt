@@ -1,6 +1,6 @@
 .
-  README.md
-  src
-    main.py
-    utils
-      helper.py
+    README.md
+    src
+        main.py
+        utils
+            helper.py

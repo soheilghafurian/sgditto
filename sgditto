@@ -8,7 +8,7 @@
 set -eu
 
 indent=" "
-repeat_count=2
+repeat_count=4
 separator="/"
 gron_mode=0
 subcommand="tree"
@@ -30,7 +30,7 @@ when the tree was built.
            more than one character. Note: vim's foldmethod=indent
            only recognizes actual whitespace (spaces/tabs) as indent,
            so a non-whitespace -i will not fold in vim.
-  -n N     number of times to repeat -i per tree level (default: 2)
+  -n N     number of times to repeat -i per tree level (default: 4)
   -s SEP   separator between path components (default: /); may be
            more than one character
   -g       gron mode: each line is `path = value;` (as produced by
@@ -47,8 +47,8 @@ Examples:
   find . | sgditto > tree.txt && vim tree.txt
       Save the tree, then in vim: :set foldmethod=indent
 
-  sgditto -n 4 < paths.txt
-      Use 4 spaces per level instead of the default 2.
+  sgditto -n 2 < paths.txt
+      Use 2 spaces per level instead of the default 4.
 
   sgditto -i '.' < paths.txt
       Use "." as the indent string instead of spaces (for display
